@@ -1,6 +1,8 @@
 package com.jason.sunnytrip;
 
 import android.app.Activity;
+import android.graphics.Color;
+import android.graphics.PixelFormat;
 import android.os.Handler;
 import android.os.Message;
 import android.os.Bundle;
@@ -8,7 +10,10 @@ import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import org.apache.http.HttpEntity;
@@ -28,9 +33,10 @@ import java.io.InputStreamReader;
 public class MainActivity extends Activity {
     private static final int JSON_STRING = 1;
     private static final String URL = "http://rate-exchange-1.appspot.com/currency?from=JPY&to=TWD";
-    private TextView textView;
 
     WindowManager windowManager = null;
+    LinearLayout linearLayout;
+    TextView textView;
     WindowManager.LayoutParams layoutParams = null;
     public int xLast;
     public int yLast;
@@ -57,17 +63,28 @@ public class MainActivity extends Activity {
     }
 
     private void createView() {
+
+        linearLayout = new LinearLayout(getApplicationContext());
+        linearLayout.setOrientation(LinearLayout.HORIZONTAL);
+        linearLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        linearLayout.setBackgroundColor(Color.DKGRAY);
+
         textView = new TextView(getApplicationContext());
+        LinearLayout.LayoutParams mParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        textView.setLayoutParams(mParams);
         textView.setText("waiting..");
+        textView.setBackgroundColor(Color.RED);
+        linearLayout.addView(textView);
+
         windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
         layoutParams = new WindowManager.LayoutParams();
         layoutParams.type = WindowManager.LayoutParams.TYPE_PHONE;
-        layoutParams.format = 1;
-        layoutParams.flags = WindowManager.LayoutParams.FLAG_TOUCHABLE_WHEN_WAKING;
-        layoutParams.width = WindowManager.LayoutParams.WRAP_CONTENT;
-        layoutParams.height = WindowManager.LayoutParams.WRAP_CONTENT;
+        layoutParams.format = PixelFormat.RGBA_8888;
+        layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        layoutParams.width = LinearLayout.LayoutParams.WRAP_CONTENT;
+        layoutParams.height = LinearLayout.LayoutParams.WRAP_CONTENT;
         layoutParams.gravity = Gravity.CENTER | Gravity.TOP;
-        windowManager.addView(textView, layoutParams);
+        windowManager.addView(linearLayout, layoutParams);
 
         textView.setOnTouchListener(new View.OnTouchListener() {
             @Override
@@ -79,7 +96,7 @@ public class MainActivity extends Activity {
                         yC = yC + (int) event.getRawY() - yLast;
                         layoutParams.x = xC;
                         layoutParams.y = yC;
-                        windowManager.updateViewLayout(textView, layoutParams);
+                        windowManager.updateViewLayout(linearLayout, layoutParams);
                     }
                     xLast = (int) event.getRawX();
                     yLast = (int) event.getRawY();
@@ -109,11 +126,14 @@ public class MainActivity extends Activity {
                 //Todo
                 if (!isMoving) {
                     if (windowManager!=null){
-                        windowManager.removeView(textView);
+                        windowManager.removeView(linearLayout);
                         windowManager=null;
                     }
-                    Log.d("onLongClick","windowManager.removeView");
+                    Log.d("onLongClick", "windowManager.removeView");
                     MainActivity.this.finish();
+                    int pid = android.os.Process.myPid();
+                    Log.d("SunnyTrip","pid: " + pid + ", kill process.");
+                    android.os.Process.killProcess(pid);
                 }
                 return true;
             }
@@ -180,18 +200,22 @@ public class MainActivity extends Activity {
                     stringBuilder.append(line);
                     Log.d("mRequestHttp", "BufferedReader.readLine : " + line);
                 }
+                return stringBuilder.toString();
             } else if (statusCode >= 400) {
                 Log.d("mRequestHttp", "Client Error, with status: " + statusCode);
+                return "Client Error!";
             } else if (statusCode >= 500) {
                 Log.d("mRequestHttp", "Server Error, with status: " + statusCode);
+                return "Server Error!";
             } else {
                 Log.d("mRequestHttp", "Error, with status: " + statusCode);
+                return "Error!";
             }
         } catch (ClientProtocolException e) {
             Log.d("ClientProtocolException", "Error:" + e);
         } catch (IOException e) {
             Log.d("IOException", "Error:" + e);
         }
-        return stringBuilder.toString();
+        return "Exception!";
     }
 }
