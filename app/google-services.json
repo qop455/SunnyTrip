@@ -1,0 +1,42 @@
+{
+  "project_info": {
+    "project_id": "sunnytrip-1208",
+    "project_number": "947587828981",
+    "name": "sunnytrip"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:947587828981:android:0c398637625402e8",
+        "client_id": "android:com.jason.sunnytrip",
+        "client_type": 1,
+        "android_client_info": {
+          "package_name": "com.jason.sunnytrip"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [],
+      "services": {
+        "analytics_service": {
+          "status": 1
+        },
+        "cloud_messaging_service": {
+          "status": 2,
+          "apns_config": []
+        },
+        "appinvite_service": {
+          "status": 1,
+          "other_platform_oauth_client": []
+        },
+        "google_signin_service": {
+          "status": 1
+        },
+        "ads_service": {
+          "status": 1
+        }
+      }
+    }
+  ],
+  "client_info": [],
+  "ARTIFACT_VERSION": "1"
+}

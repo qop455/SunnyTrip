@@ -3,16 +3,14 @@ package com.jason.sunnytrip;
 import android.app.Activity;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
-import android.os.Bundle;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.ViewGroup;
 import android.view.WindowManager;
-import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -23,6 +21,7 @@ import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
+import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
@@ -31,23 +30,36 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 
 public class MainActivity extends Activity {
-    private static final int JSON_STRING = 1;
+    private static final String TAG = "MainActivity";
+    private static final int RATE_STRING = 1;
     private static final String URL = "http://rate-exchange-1.appspot.com/currency?from=JPY&to=TWD";
-
+    private static final String PROJECT_NUMBER="947587828981";
+    public int xLast, yLast, xC, yC;
     WindowManager windowManager = null;
     LinearLayout linearLayout;
     TextView textView;
     WindowManager.LayoutParams layoutParams = null;
-    public int xLast;
-    public int yLast;
-    public int xC;
-    public int yC;
     private boolean isMoving = false;
     private boolean isFirst = true;
+    private Handler mHandler = new Handler() {
+        public void handleMessage(Message msg) {
+            super.handleMessage(msg);
+            switch (msg.what) {
+                case RATE_STRING:
+                    try {
+                        textView.setText(msg.getData().getString("result"));
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                    }
+                    break;
+            }
+        }
+    };
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        Log.d(TAG, "onCreate");
         if (windowManager == null) {
             createView();
         }
@@ -55,10 +67,36 @@ public class MainActivity extends Activity {
             HttpThread httpThread = new HttpThread();
             httpThread.start();
         }
+        GCMClientManager pushClientManager = new GCMClientManager(this, PROJECT_NUMBER);
+        pushClientManager.registerIfNeeded(new GCMClientManager.RegistrationCompletedHandler() {
+            @Override
+            public void onSuccess(String registrationId, boolean isNewRegistration) {
+
+                Log.d(TAG,"Registration id: "+registrationId);
+                //send this registrationId to your server
+            }
+            @Override
+            public void onFailure(String ex) {
+                super.onFailure(ex);
+            }
+        });
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        Log.d(TAG, "onResume");
+    }
+
+    @Override
+    protected void onPause() {
+        Log.d(TAG, "onPause");
+        super.onPause();
     }
 
     @Override
     protected void onDestroy() {
+        Log.d(TAG, "onDestroy");
         super.onDestroy();
     }
 
@@ -80,7 +118,7 @@ public class MainActivity extends Activity {
         layoutParams = new WindowManager.LayoutParams();
         layoutParams.type = WindowManager.LayoutParams.TYPE_PHONE;
         layoutParams.format = PixelFormat.RGBA_8888;
-        layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL|WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
         layoutParams.width = LinearLayout.LayoutParams.WRAP_CONTENT;
         layoutParams.height = LinearLayout.LayoutParams.WRAP_CONTENT;
         layoutParams.gravity = Gravity.CENTER | Gravity.TOP;
@@ -116,7 +154,7 @@ public class MainActivity extends Activity {
                     //do something here
                     textView.setText("waiting..");
                     new HttpThread().start();
-                    Log.d("onClick","HttpThread.start");
+                    Log.d(TAG, "HttpThread.start");
                 }
             }
         });
@@ -125,63 +163,20 @@ public class MainActivity extends Activity {
             public boolean onLongClick(View v) {
                 //Todo
                 if (!isMoving) {
-                    if (windowManager!=null){
+                    if (windowManager != null) {
                         windowManager.removeView(linearLayout);
-                        windowManager=null;
+                        windowManager = null;
                     }
-                    Log.d("onLongClick", "windowManager.removeView");
+                    Log.d(TAG, "windowManager.removeView");
                     MainActivity.this.finish();
                     int pid = android.os.Process.myPid();
-                    Log.d("SunnyTrip","pid: " + pid + ", kill process.");
+                    Log.d(TAG, "pid: " + pid + ", kill process.");
                     android.os.Process.killProcess(pid);
                 }
                 return true;
             }
         });
     }
-
-    class HttpThread extends Thread {
-        @Override
-        public void run() {
-            // TODO Auto-generated method stub
-            super.run();
-            try {
-                String result = mRequestHttp(URL);
-                Bundle bundle = new Bundle();
-                bundle.putString("result", result);
-
-                Message msg = new Message();
-                msg.what = JSON_STRING;
-                msg.setData(bundle);
-                mHandler.sendMessage(msg);
-            } catch (Exception e) {
-                e.printStackTrace();
-            }
-        }
-    }
-
-    private Handler mHandler = new Handler() {
-        public void handleMessage(Message msg) {
-            super.handleMessage(msg);
-            switch (msg.what) {
-                case JSON_STRING:
-                    try {
-                        JSONObject jsonObject = new JSONObject(msg.getData().getString("result"));
-                        Log.d(MainActivity.class.getName(), jsonObject.getString("to"));
-                        Log.d(MainActivity.class.getName(), jsonObject.getString("rate"));
-                        Log.d(MainActivity.class.getName(), jsonObject.getString("from"));
-                        String mTo = jsonObject.getString("to");
-                        String mRate = jsonObject.getString("rate");
-                        String mFrom = jsonObject.getString("from");
-
-                        textView.setText(mRate);
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
-                    break;
-            }
-        }
-    };
 
     public String mRequestHttp(String url) {
         StringBuilder stringBuilder = new StringBuilder();
@@ -198,24 +193,56 @@ public class MainActivity extends Activity {
                 String line;
                 while ((line = bufferedReader.readLine()) != null) {
                     stringBuilder.append(line);
-                    Log.d("mRequestHttp", "BufferedReader.readLine : " + line);
+                    Log.d(TAG, "BufferedReader.readLine : " + line);
                 }
-                return stringBuilder.toString();
+                try {
+                    JSONObject jsonObject = null;
+                    jsonObject = new JSONObject(stringBuilder.toString());
+                    Log.d(MainActivity.class.getName(), jsonObject.getString("to"));
+                    Log.d(MainActivity.class.getName(), jsonObject.getString("rate"));
+                    Log.d(MainActivity.class.getName(), jsonObject.getString("from"));
+                    String mTo = jsonObject.getString("to");
+                    String mRate = jsonObject.getString("rate");
+                    String mFrom = jsonObject.getString("from");
+                    return mRate;
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             } else if (statusCode >= 400) {
-                Log.d("mRequestHttp", "Client Error, with status: " + statusCode);
+                Log.d(TAG, "Client Error, with status: " + statusCode);
                 return "Client Error!";
             } else if (statusCode >= 500) {
-                Log.d("mRequestHttp", "Server Error, with status: " + statusCode);
+                Log.d(TAG, "Server Error, with status: " + statusCode);
                 return "Server Error!";
             } else {
-                Log.d("mRequestHttp", "Error, with status: " + statusCode);
+                Log.d(TAG, "Error, with status: " + statusCode);
                 return "Error!";
             }
         } catch (ClientProtocolException e) {
-            Log.d("ClientProtocolException", "Error:" + e);
+            Log.d(TAG, "Error:" + e);
         } catch (IOException e) {
-            Log.d("IOException", "Error:" + e);
+            Log.d(TAG, "Error:" + e);
         }
         return "Exception!";
+    }
+
+    class HttpThread extends Thread {
+        @Override
+        public void run() {
+            // TODO Auto-generated method stub
+            super.run();
+            try {
+                String result = mRequestHttp(URL);
+                Bundle bundle = new Bundle();
+                bundle.putString("result", result);
+
+                Message msg = new Message();
+                msg.what = RATE_STRING;
+                msg.setData(bundle);
+                mHandler.sendMessage(msg);
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
     }
 }
