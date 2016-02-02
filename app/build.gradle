@@ -7,7 +7,7 @@ android {
     defaultConfig{
         applicationId "com.jason.sunnytrip"
         versionCode 1
-        versionName "1.0.1"
+        versionName "1.0.2"
         setProperty("archivesBaseName", "sunnytrip-$versionName")
     }
 

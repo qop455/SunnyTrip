@@ -1,11 +1,18 @@
 package com.jason.sunnytrip;
 
 import android.app.Activity;
+import android.content.BroadcastReceiver;
+import android.content.ClipData;
+import android.content.ClipboardManager;
+import android.content.Context;
+import android.content.Intent;
+import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
+import android.support.v4.content.LocalBroadcastManager;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.MotionEvent;
@@ -32,8 +39,9 @@ import java.io.InputStreamReader;
 public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
     private static final int RATE_STRING = 1;
+    private static final int GCM_MSG = 2;
     private static final String URL = "http://rate-exchange-1.appspot.com/currency?from=JPY&to=TWD";
-    private static final String PROJECT_NUMBER="947587828981";
+    private static final String PROJECT_NUMBER = "947587828981";
     public int xLast, yLast, xC, yC;
     WindowManager windowManager = null;
     LinearLayout linearLayout;
@@ -46,13 +54,40 @@ public class MainActivity extends Activity {
             super.handleMessage(msg);
             switch (msg.what) {
                 case RATE_STRING:
-                    try {
-                        textView.setText(msg.getData().getString("result"));
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                    }
+                    textView.setText(msg.getData().getString("result"));
+                    break;
+
+                case GCM_MSG:
+                    Bundle data=msg.getData();
+                    String title = data.getString("title");
+                    String subtitle = data.getString("subtitle");
+                    String message = data.getString("message");
+                    String tickerText = data.getString("tickerText");
+                    String vibrate = data.getString("vibrate");
+                    String sound = data.getString("sound");
+
+                    Log.d(TAG,"title:"+title);
+                    Log.d(TAG,"subtitle:"+subtitle);
+                    Log.d(TAG,"message:"+message);
+                    Log.d(TAG,"tickerText:"+tickerText);
+                    Log.d(TAG,"vibrate:"+vibrate);
+                    Log.d(TAG,"sound:"+sound);
+
+                    textView.setText(message);
                     break;
             }
+        }
+    };
+    private BroadcastReceiver mMessageReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            Log.d(TAG, "onReceive: " + intent.getAction());
+            // Extract data included in the Intenton());
+
+            Message msg = new Message();
+            msg.what = GCM_MSG;
+            msg.setData(intent.getExtras());
+            mHandler.sendMessage(msg);
         }
     };
 
@@ -72,9 +107,12 @@ public class MainActivity extends Activity {
             @Override
             public void onSuccess(String registrationId, boolean isNewRegistration) {
 
-                Log.d(TAG,"Registration id: "+registrationId);
-                //send this registrationId to your server
+                Log.d(TAG, "Registration id: " + registrationId);
+                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                ClipData clip = ClipData.newPlainText("label", registrationId);
+                clipboard.setPrimaryClip(clip);
             }
+
             @Override
             public void onFailure(String ex) {
                 super.onFailure(ex);
@@ -85,13 +123,21 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
+        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, new IntentFilter("my-event"));
         Log.d(TAG, "onResume");
     }
 
     @Override
     protected void onPause() {
-        Log.d(TAG, "onPause");
         super.onPause();
+        Log.d(TAG, "onPause");
+    }
+
+    @Override
+    protected void onStop() {
+        super.onStop();
+        Log.d(TAG, "onStop");
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mMessageReceiver);
     }
 
     @Override
@@ -224,6 +270,10 @@ public class MainActivity extends Activity {
             Log.d(TAG, "Error:" + e);
         }
         return "Exception!";
+    }
+
+    public Handler getmHandler() {
+        return this.mHandler;
     }
 
     class HttpThread extends Thread {
