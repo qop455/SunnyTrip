@@ -40,7 +40,6 @@ public class MainActivity extends Activity {
     private static final String TAG = "MainActivity";
     private static final int RATE_STRING = 1;
     private static final int GCM_MSG = 2;
-    private static final String URL = "http://rate-exchange-1.appspot.com/currency?from=JPY&to=TWD";
     private static final String PROJECT_NUMBER = "947587828981";
     public int xLast, yLast, xC, yC;
     WindowManager windowManager = null;
@@ -54,26 +53,22 @@ public class MainActivity extends Activity {
             super.handleMessage(msg);
             switch (msg.what) {
                 case RATE_STRING:
-                    textView.setText(msg.getData().getString("result"));
+                    try {
+                        JSONObject jsonObject = null;
+                        jsonObject = new JSONObject(msg.getData().getString("result"));
+                        Log.d(MainActivity.class.getName(), jsonObject.getString("to"));
+                        Log.d(MainActivity.class.getName(), jsonObject.getString("rate"));
+                        Log.d(MainActivity.class.getName(), jsonObject.getString("from"));
+                        String mTo = jsonObject.getString("to");
+                        String mRate = jsonObject.getString("rate");
+                        String mFrom = jsonObject.getString("from");
+                        textView.setText(mRate);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
                     break;
-
                 case GCM_MSG:
-                    Bundle data=msg.getData();
-                    String title = data.getString("title");
-                    String subtitle = data.getString("subtitle");
-                    String message = data.getString("message");
-                    String tickerText = data.getString("tickerText");
-                    String vibrate = data.getString("vibrate");
-                    String sound = data.getString("sound");
-
-                    Log.d(TAG,"title:"+title);
-                    Log.d(TAG,"subtitle:"+subtitle);
-                    Log.d(TAG,"message:"+message);
-                    Log.d(TAG,"tickerText:"+tickerText);
-                    Log.d(TAG,"vibrate:"+vibrate);
-                    Log.d(TAG,"sound:"+sound);
-
-                    textView.setText(message);
+                    textView.setText(msg.getData().getString("result"));
                     break;
             }
         }
@@ -82,12 +77,7 @@ public class MainActivity extends Activity {
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.d(TAG, "onReceive: " + intent.getAction());
-            // Extract data included in the Intenton());
 
-            Message msg = new Message();
-            msg.what = GCM_MSG;
-            msg.setData(intent.getExtras());
-            mHandler.sendMessage(msg);
         }
     };
 
@@ -107,6 +97,11 @@ public class MainActivity extends Activity {
             @Override
             public void onSuccess(String registrationId, boolean isNewRegistration) {
 
+                HttpThread tokenHttpThread = new HttpThread();
+                tokenHttpThread.url = "http://140.113.72.19/GCM/add.php?token=" + registrationId;
+                tokenHttpThread.what = GCM_MSG;
+                tokenHttpThread.start();
+
                 Log.d(TAG, "Registration id: " + registrationId);
                 ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
                 ClipData clip = ClipData.newPlainText("label", registrationId);
@@ -123,7 +118,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, new IntentFilter("my-event"));
+        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, new IntentFilter("GCM_EVENT"));
         Log.d(TAG, "onResume");
     }
 
@@ -224,7 +219,7 @@ public class MainActivity extends Activity {
         });
     }
 
-    public String mRequestHttp(String url) {
+    public String RequestHttp(String url) {
         StringBuilder stringBuilder = new StringBuilder();
         HttpClient httpClient = new DefaultHttpClient();
         HttpGet httpGet = new HttpGet(url);
@@ -241,19 +236,7 @@ public class MainActivity extends Activity {
                     stringBuilder.append(line);
                     Log.d(TAG, "BufferedReader.readLine : " + line);
                 }
-                try {
-                    JSONObject jsonObject = null;
-                    jsonObject = new JSONObject(stringBuilder.toString());
-                    Log.d(MainActivity.class.getName(), jsonObject.getString("to"));
-                    Log.d(MainActivity.class.getName(), jsonObject.getString("rate"));
-                    Log.d(MainActivity.class.getName(), jsonObject.getString("from"));
-                    String mTo = jsonObject.getString("to");
-                    String mRate = jsonObject.getString("rate");
-                    String mFrom = jsonObject.getString("from");
-                    return mRate;
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
+                return stringBuilder.toString();
             } else if (statusCode >= 400) {
                 Log.d(TAG, "Client Error, with status: " + statusCode);
                 return "Client Error!";
@@ -272,22 +255,21 @@ public class MainActivity extends Activity {
         return "Exception!";
     }
 
-    public Handler getmHandler() {
-        return this.mHandler;
-    }
-
     class HttpThread extends Thread {
+        String url = "http://rate-exchange-1.appspot.com/currency?from=JPY&to=TWD";
+        int what = RATE_STRING;
+
         @Override
         public void run() {
             // TODO Auto-generated method stub
             super.run();
             try {
-                String result = mRequestHttp(URL);
+                String result = RequestHttp(url);
                 Bundle bundle = new Bundle();
                 bundle.putString("result", result);
 
                 Message msg = new Message();
-                msg.what = RATE_STRING;
+                msg.what = what;
                 msg.setData(bundle);
                 mHandler.sendMessage(msg);
             } catch (Exception e) {

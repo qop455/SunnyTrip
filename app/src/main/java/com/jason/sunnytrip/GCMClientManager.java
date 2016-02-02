@@ -3,6 +3,7 @@ package com.jason.sunnytrip;
 /**
  * Created by jason on 16/2/1.
  */
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.SharedPreferences;
@@ -10,10 +11,12 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.os.AsyncTask;
 import android.util.Log;
+
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GooglePlayServicesUtil;
 import com.google.android.gms.gcm.GoogleCloudMessaging;
 import com.google.android.gms.iid.InstanceID;
+
 import java.io.IOException;
 public class GCMClientManager {
     // Constants
@@ -166,6 +169,7 @@ public class GCMClientManager {
     private Activity getActivity() {
         return activity;
     }
+
     public static abstract class RegistrationCompletedHandler {
         public abstract void onSuccess(String registrationId, boolean isNewRegistration);
         public void onFailure(String ex) {
