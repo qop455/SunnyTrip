@@ -43,6 +43,7 @@ public class MainActivity extends Activity {
     private static final int JAPAN = 11;
     private static final int CHINA = 12;
     private static final int AMERICA = 13;
+    private static final int HONGKONG = 14;
     private static final String TAG = "MainActivity";
     private static final String PROJECT_NUMBER = "947587828981";
     public int xLast, yLast, xC, yC;
@@ -88,6 +89,9 @@ public class MainActivity extends Activity {
                         case AMERICA:
                             imageView.setImageResource(R.drawable.americapic);
                             break;
+                        case HONGKONG:
+                            imageView.setImageResource(R.drawable.hongkongpic);
+                            break;
                     }
                     break;
             }
@@ -107,12 +111,15 @@ public class MainActivity extends Activity {
                 case "AMERICA":
                     setCountry(AMERICA);
                     break;
+                case "HONGKONG":
+                    setCountry(HONGKONG);
+                    break;
             }
         }
     };
 
     private void setCountry(int c) {
-        if (c != JAPAN && c != CHINA && c != AMERICA) {
+        if (c != JAPAN && c != CHINA && c != AMERICA && c != HONGKONG) {
             Log.d(TAG, "setCountry failed with country undefined. ('" + c + "')");
             return;
         }
@@ -241,6 +248,9 @@ public class MainActivity extends Activity {
                             setCountry(AMERICA);
                             break;
                         case AMERICA:
+                            setCountry(HONGKONG);
+                            break;
+                        case HONGKONG:
                             setCountry(JAPAN);
                             break;
                     }
@@ -336,8 +346,10 @@ public class MainActivity extends Activity {
                     url += "JPY";
                 } else if (country == CHINA) {
                     url += "CNY";
-                } else {
+                } else if (country == AMERICA){
                     url += "USD";
+                } else{
+                    url += "HKD";
                 }
                 String result = RequestHttp(url);
                 Bundle bundle = new Bundle();

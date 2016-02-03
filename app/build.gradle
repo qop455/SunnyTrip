@@ -6,8 +6,8 @@ android {
     buildToolsVersion "23.0.1"
     defaultConfig{
         applicationId "com.jason.sunnytrip"
-        versionCode 4
-        versionName "1.4"
+        versionCode 5
+        versionName "1.5"
         setProperty("archivesBaseName", "sunnytrip-$versionName")
     }
 
