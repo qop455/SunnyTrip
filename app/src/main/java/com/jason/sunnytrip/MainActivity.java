@@ -2,13 +2,12 @@ package com.jason.sunnytrip;
 
 import android.app.Activity;
 import android.content.BroadcastReceiver;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.graphics.Color;
 import android.graphics.PixelFormat;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Message;
@@ -18,6 +17,7 @@ import android.view.Gravity;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
@@ -37,15 +37,21 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 
 public class MainActivity extends Activity {
+    public static final int RATE_STRING = 1;
+    public static final int TOKEN_RESPONSE = 2;
+    public static final int COUNTRY_SWITCH = 3;
+    private static final int JAPAN = 11;
+    private static final int CHINA = 12;
+    private static final int AMERICA = 13;
     private static final String TAG = "MainActivity";
-    private static final int RATE_STRING = 1;
-    private static final int GCM_MSG = 2;
     private static final String PROJECT_NUMBER = "947587828981";
     public int xLast, yLast, xC, yC;
     WindowManager windowManager = null;
     LinearLayout linearLayout;
     TextView textView;
+    ImageView imageView;
     WindowManager.LayoutParams layoutParams = null;
+    private int country = JAPAN;
     private boolean isMoving = false;
     private boolean isFirst = true;
     private Handler mHandler = new Handler() {
@@ -56,19 +62,33 @@ public class MainActivity extends Activity {
                     try {
                         JSONObject jsonObject = null;
                         jsonObject = new JSONObject(msg.getData().getString("result"));
-                        Log.d(MainActivity.class.getName(), jsonObject.getString("to"));
-                        Log.d(MainActivity.class.getName(), jsonObject.getString("rate"));
-                        Log.d(MainActivity.class.getName(), jsonObject.getString("from"));
                         String mTo = jsonObject.getString("to");
                         String mRate = jsonObject.getString("rate");
                         String mFrom = jsonObject.getString("from");
+                        Log.d(TAG, "To: " + mTo);
+                        Log.d(TAG, ",Rate: " + mRate);
+                        Log.d(TAG, ",From: " + mFrom);
                         textView.setText(mRate);
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
                     break;
-                case GCM_MSG:
-                    textView.setText(msg.getData().getString("result"));
+                case TOKEN_RESPONSE:
+                    textView.setText(msg.getData().getString("response"));
+                    break;
+                case COUNTRY_SWITCH:
+                    textView.setText("waiting..");
+                    switch (msg.getData().getInt("country")) {
+                        case JAPAN:
+                            imageView.setImageResource(R.drawable.japanpic);
+                            break;
+                        case CHINA:
+                            imageView.setImageResource(R.drawable.chinapic);
+                            break;
+                        case AMERICA:
+                            imageView.setImageResource(R.drawable.americapic);
+                            break;
+                    }
                     break;
             }
         }
@@ -77,9 +97,36 @@ public class MainActivity extends Activity {
         @Override
         public void onReceive(Context context, Intent intent) {
             Log.d(TAG, "onReceive: " + intent.getAction());
-
+            switch (intent.getStringExtra("country")){
+                case "JAPAN":
+                    setCountry(JAPAN);
+                    break;
+                case "CHINA":
+                    setCountry(CHINA);
+                    break;
+                case "AMERICA":
+                    setCountry(AMERICA);
+                    break;
+            }
         }
     };
+
+    private void setCountry(int c) {
+        if (c != JAPAN && c != CHINA && c != AMERICA) {
+            Log.d(TAG, "setCountry failed with country undefined. ('" + c + "')");
+            return;
+        }
+        this.country = c;
+
+        Bundle bundle = new Bundle();
+        bundle.putInt("country", country);
+
+        Message msg = new Message();
+        msg.what = COUNTRY_SWITCH;
+        msg.setData(bundle);
+        mHandler.sendMessage(msg);
+        new HttpThread().start();
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -96,16 +143,22 @@ public class MainActivity extends Activity {
         pushClientManager.registerIfNeeded(new GCMClientManager.RegistrationCompletedHandler() {
             @Override
             public void onSuccess(String registrationId, boolean isNewRegistration) {
+                if (!isNewRegistration) return;
+                final String url = "http://140.113.72.19/GCM/add.php?token=" + registrationId;
+                new Thread(new Runnable() {
+                    @Override
+                    public void run() {
+                        String response = RequestHttp(url);
+                        Bundle bundle = new Bundle();
+                        bundle.putString("response", response);
 
-                HttpThread tokenHttpThread = new HttpThread();
-                tokenHttpThread.url = "http://140.113.72.19/GCM/add.php?token=" + registrationId;
-                tokenHttpThread.what = GCM_MSG;
-                tokenHttpThread.start();
-
+                        Message msg = new Message();
+                        msg.what = TOKEN_RESPONSE;
+                        msg.setData(bundle);
+                        mHandler.sendMessage(msg);
+                    }
+                }).start();
                 Log.d(TAG, "Registration id: " + registrationId);
-                ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
-                ClipData clip = ClipData.newPlainText("label", registrationId);
-                clipboard.setPrimaryClip(clip);
             }
 
             @Override
@@ -118,7 +171,7 @@ public class MainActivity extends Activity {
     @Override
     protected void onResume() {
         super.onResume();
-        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, new IntentFilter("GCM_EVENT"));
+        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, new IntentFilter("GCM_UPDATE"));
         Log.d(TAG, "onResume");
     }
 
@@ -145,27 +198,15 @@ public class MainActivity extends Activity {
 
         linearLayout = new LinearLayout(getApplicationContext());
         linearLayout.setOrientation(LinearLayout.HORIZONTAL);
-        linearLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
-        linearLayout.setBackgroundColor(Color.DKGRAY);
+        linearLayout.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        linearLayout.setBackgroundColor(Color.RED);
 
-        textView = new TextView(getApplicationContext());
-        LinearLayout.LayoutParams mParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        textView.setLayoutParams(mParams);
-        textView.setText("waiting..");
-        textView.setBackgroundColor(Color.RED);
-        linearLayout.addView(textView);
-
-        windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
-        layoutParams = new WindowManager.LayoutParams();
-        layoutParams.type = WindowManager.LayoutParams.TYPE_PHONE;
-        layoutParams.format = PixelFormat.RGBA_8888;
-        layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
-        layoutParams.width = LinearLayout.LayoutParams.WRAP_CONTENT;
-        layoutParams.height = LinearLayout.LayoutParams.WRAP_CONTENT;
-        layoutParams.gravity = Gravity.CENTER | Gravity.TOP;
-        windowManager.addView(linearLayout, layoutParams);
-
-        textView.setOnTouchListener(new View.OnTouchListener() {
+        imageView = new ImageView(getApplicationContext());
+        imageView.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
+        imageView.setImageResource(R.drawable.japanpic);
+        imageView.getLayoutParams().height = 100;
+        imageView.getLayoutParams().width = 140;
+        imageView.setOnTouchListener(new View.OnTouchListener() {
             @Override
             public boolean onTouch(View v, MotionEvent event) {
                 if (event.getAction() == MotionEvent.ACTION_MOVE) {
@@ -188,18 +229,25 @@ public class MainActivity extends Activity {
                 return false;
             }
         });
-        textView.setOnClickListener(new View.OnClickListener() {
+        imageView.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (!isMoving) {
-                    //do something here
-                    textView.setText("waiting..");
-                    new HttpThread().start();
-                    Log.d(TAG, "HttpThread.start");
+                    switch (country) {
+                        case JAPAN:
+                            setCountry(CHINA);
+                            break;
+                        case CHINA:
+                            setCountry(AMERICA);
+                            break;
+                        case AMERICA:
+                            setCountry(JAPAN);
+                            break;
+                    }
                 }
             }
         });
-        textView.setOnLongClickListener(new View.OnLongClickListener() {
+        imageView.setOnLongClickListener(new View.OnLongClickListener() {
             @Override
             public boolean onLongClick(View v) {
                 //Todo
@@ -217,6 +265,27 @@ public class MainActivity extends Activity {
                 return true;
             }
         });
+
+        textView = new TextView(getApplicationContext());
+        textView.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT));
+        textView.setText("waiting..");
+        textView.setTextSize(25);
+        Typeface typeface = Typeface.createFromAsset(getAssets(),
+                "fonts/orange-juice-2.0.ttf");
+        textView.setTypeface(typeface);
+        textView.setPadding(15, 0, 0, 0);
+        linearLayout.addView(imageView);
+        linearLayout.addView(textView);
+
+        windowManager = (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
+        layoutParams = new WindowManager.LayoutParams();
+        layoutParams.type = WindowManager.LayoutParams.TYPE_PHONE;
+        layoutParams.format = PixelFormat.RGBA_8888;
+        layoutParams.flags = WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL | WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE;
+        layoutParams.width = LinearLayout.LayoutParams.WRAP_CONTENT;
+        layoutParams.height = LinearLayout.LayoutParams.WRAP_CONTENT;
+        layoutParams.gravity = Gravity.CENTER | Gravity.TOP;
+        windowManager.addView(linearLayout, layoutParams);
     }
 
     public String RequestHttp(String url) {
@@ -256,20 +325,26 @@ public class MainActivity extends Activity {
     }
 
     class HttpThread extends Thread {
-        String url = "http://rate-exchange-1.appspot.com/currency?from=JPY&to=TWD";
-        int what = RATE_STRING;
-
         @Override
         public void run() {
             // TODO Auto-generated method stub
             super.run();
+            Log.d(TAG, "HttpThread");
             try {
+                String url = "http://rate-exchange-1.appspot.com/currency?to=TWD&from=";
+                if (country == JAPAN) {
+                    url += "JPY";
+                } else if (country == CHINA) {
+                    url += "CNY";
+                } else {
+                    url += "USD";
+                }
                 String result = RequestHttp(url);
                 Bundle bundle = new Bundle();
                 bundle.putString("result", result);
 
                 Message msg = new Message();
-                msg.what = what;
+                msg.what = RATE_STRING;
                 msg.setData(bundle);
                 mHandler.sendMessage(msg);
             } catch (Exception e) {

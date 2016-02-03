@@ -21,18 +21,23 @@ public class PushNotificationService extends GcmListenerService {
     public void onMessageReceived(String from, Bundle data) {
         Log.d(TAG, "onMessageReceived");
 
-        Intent intent = new Intent("GCM_EVENT");
-        LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
-
         String title = data.getString("title");
         String text = data.getString("text");
+        Log.d(TAG, "title: " + title);
+        Log.d(TAG, "text: " + text);
+
+        if (title.equals("RateUpdate")) {
+            Intent intent = new Intent("GCM_UPDATE");
+            intent.putExtra("country", text);
+            LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+            return;
+        }
+
         String subtext = data.getString("subtext");
         String ticker = data.getString("ticker");
 
-        Log.d(TAG, "title:" + title);
-        Log.d(TAG, "text:" + text);
-        Log.d(TAG, "subtext:" + subtext);
-        Log.d(TAG, "ticker:" + ticker);
+        Log.d(TAG, "subtext: " + subtext);
+        Log.d(TAG, "ticker: " + ticker);
 
         NotificationManager notificationManager = (NotificationManager)
                 this.getSystemService(Context.NOTIFICATION_SERVICE);
